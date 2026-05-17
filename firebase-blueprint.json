@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "A contact form submission from a potential client.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "description", "createdAt"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Information about a business client.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "company": { "type": "string" },
+        "status": { "type": "string", "enum": ["lead", "active", "past"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "status", "createdAt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Internal project management record.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "notes": { "type": "string" },
+        "budget": { "type": "number" },
+        "status": { "type": "string", "enum": ["planning", "in-progress", "completed", "on-hold"] },
+        "deadline": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "title", "status", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A specific task within a project.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "assignedTo": { "type": "string", "description": "Team member ID" },
+        "dueDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "title", "isCompleted"]
+    },
+    "ActivityRecord": {
+      "title": "Activity Record",
+      "description": "A log of an action taken by a team member.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "createdAt"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Billing record for a project.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "overdue"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "amount", "status", "createdAt"]
+    },
+    "TeamMember": {
+      "title": "Team Member",
+      "description": "A member of the professional team.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string", "enum": ["available", "busy", "away"] },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "inquiries/{inquiryId}": {
+      "schema": "Inquiry",
+      "description": "Collection of contact inquiries."
+    },
+    "clients/{clientId}": {
+      "schema": "Client",
+      "description": "Your list of professional clients."
+    },
+    "projects/{projectId}": {
+      "schema": "Project",
+      "description": "Projects tracked for clients."
+    },
+    "tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks associated with projects."
+    },
+    "team/{memberId}": {
+      "schema": "TeamMember",
+      "description": "Internal team registry."
+    },
+    "activity/{activityId}": {
+      "schema": "ActivityRecord",
+      "description": "System-wide activity audit log."
+    },
+    "invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "Financial billing records."
+    },
+    "notifications/{notificationId}": {
+      "schema": "object",
+      "description": "Real-time alerts for users."
+    }
+  }
+}
