@@ -108,9 +108,10 @@ const SKILLS: Skill[] = [
 // --- Components ---
 
 const CustomCursor = () => {
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
+  const mouseX = useMotionValue(-100);
+  const mouseY = useMotionValue(-100);
   const [isHovering, setIsHovering] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const cursorX = useSpring(mouseX, { damping: 25, stiffness: 400 });
   const cursorY = useSpring(mouseY, { damping: 25, stiffness: 400 });
 
@@ -118,6 +119,7 @@ const CustomCursor = () => {
     const moveCursor = (e: MouseEvent) => {
       mouseX.set(e.clientX);
       mouseY.set(e.clientY);
+      if (!isVisible) setIsVisible(true);
     };
 
     const handleHover = (e: MouseEvent) => {
@@ -125,17 +127,27 @@ const CustomCursor = () => {
       setIsHovering(!!target.closest('a, button, .group, [role="button"]'));
     };
 
+    const handleMouseOut = () => setIsVisible(false);
+    const handleMouseOver = () => setIsVisible(true);
+
     window.addEventListener('mousemove', moveCursor, { passive: true });
     window.addEventListener('mouseover', handleHover);
+    window.addEventListener('mouseleave', handleMouseOut);
+    window.addEventListener('mouseenter', handleMouseOver);
+    
     return () => {
       window.removeEventListener('mousemove', moveCursor);
       window.removeEventListener('mouseover', handleHover);
+      window.removeEventListener('mouseleave', handleMouseOut);
+      window.removeEventListener('mouseenter', handleMouseOver);
     };
-  }, []);
+  }, [isVisible]);
+
+  if (!isVisible) return null;
 
   return (
     <motion.div 
-      className="fixed top-0 left-0 w-8 h-8 border border-luxury-accent rounded-full pointer-events-none z-[30000] flex items-center justify-center hidden md:flex"
+      className="fixed top-0 left-0 w-8 h-8 border border-luxury-accent rounded-full pointer-events-none z-[999999] flex items-center justify-center hidden md:flex"
       style={{
         x: cursorX,
         y: cursorY,
@@ -689,8 +701,8 @@ function HomeView() {
             >
               Senior Backend Architect
             </motion.span>
-            <h1 className="text-4xl md:text-8xl lg:text-9xl font-serif leading-[0.9] tracking-tighter">
-              CRAFTING <br />
+            <h1 className="text-4xl md:text-8xl lg:text-9xl font-serif leading-[0.9] tracking-tighter break-words">
+              CRAFTING <br className="hidden sm:block" />
               <motion.span 
                 initial={{ opacity: 0.5 }}
                 animate={{ opacity: 1 }}

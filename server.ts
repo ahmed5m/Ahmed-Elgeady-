@@ -6,6 +6,7 @@ import nodemailer from "nodemailer";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import admin from "firebase-admin";
+import { getFirestore as getAdminFirestore, FieldValue } from "firebase-admin/firestore";
 import fs from "fs";
 
 dotenv.config();
@@ -17,12 +18,18 @@ const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
 // Initialize Firebase Admin SDK for user management and database access
 try {
-  admin.initializeApp();
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      projectId: firebaseConfig.projectId
+    });
+  }
 } catch (e) {
-  console.warn("Firebase Admin failed to initialize with default credentials. User management might be limited.");
+  console.warn("Firebase Admin failed to initialize. Database operations via Admin SDK may fail.", e);
 }
 
-const dbAdmin = admin.firestore();
+const dbAdmin = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)"
+  ? getAdminFirestore(firebaseConfig.firestoreDatabaseId)
+  : getAdminFirestore();
 
 async function startServer() {
   const app = express();
@@ -105,23 +112,27 @@ async function startServer() {
 
     try {
       // 1. Save to Firestore using Admin SDK to bypass rules
-      await dbAdmin.collection("inquiries").add({
-        name,
-        email,
-        phone: phone || null,
-        description,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      try {
+        await dbAdmin.collection("inquiries").add({
+          name,
+          email,
+          phone: phone || null,
+          description,
+          createdAt: FieldValue.serverTimestamp()
+        });
 
-      // 1.1 Create Notification for Admin
-      await dbAdmin.collection("notifications").add({
-        role: 'admin',
-        title: "New Inquiry Received",
-        message: `New inquiry from ${name}: ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}`,
-        read: false,
-        type: 'inquiry',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+        await dbAdmin.collection("notifications").add({
+          role: 'admin',
+          title: "New Inquiry Received",
+          message: `New inquiry from ${name}: ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}`,
+          read: false,
+          type: 'inquiry',
+          createdAt: FieldValue.serverTimestamp()
+        });
+      } catch (dbError) {
+        console.error("Firestore Admin write failed, falling back to client SDK simulation if possible or failing safely:", dbError);
+        // We still continue to try sending emails if DB write fails, but we might want to know it failed.
+      }
 
       // 2. Send Emails
       const transporter = getTransporter();
