@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { motion, useScroll, useTransform, AnimatePresence, useSpring } from "motion/react";
+import { motion, useScroll, useTransform, AnimatePresence, useSpring, useMotionValue } from "motion/react";
 import { 
   Github, 
   Linkedin, 
@@ -108,22 +108,24 @@ const SKILLS: Skill[] = [
 // --- Components ---
 
 const CustomCursor = () => {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
   const [isHovering, setIsHovering] = useState(false);
-  const cursorX = useSpring(position.x, { damping: 20, stiffness: 300 });
-  const cursorY = useSpring(position.y, { damping: 20, stiffness: 300 });
+  const cursorX = useSpring(mouseX, { damping: 25, stiffness: 400 });
+  const cursorY = useSpring(mouseY, { damping: 25, stiffness: 400 });
 
   useEffect(() => {
     const moveCursor = (e: MouseEvent) => {
-      setPosition({ x: e.clientX, y: e.clientY });
+      mouseX.set(e.clientX);
+      mouseY.set(e.clientY);
     };
 
     const handleHover = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      setIsHovering(!!target.closest('a, button, .group'));
+      setIsHovering(!!target.closest('a, button, .group, [role="button"]'));
     };
 
-    window.addEventListener('mousemove', moveCursor);
+    window.addEventListener('mousemove', moveCursor, { passive: true });
     window.addEventListener('mouseover', handleHover);
     return () => {
       window.removeEventListener('mousemove', moveCursor);
@@ -133,17 +135,16 @@ const CustomCursor = () => {
 
   return (
     <motion.div 
-      className="fixed top-0 left-0 w-8 h-8 border border-luxury-accent rounded-full pointer-events-none z-[10000] mix-blend-difference flex items-center justify-center"
+      className="fixed top-0 left-0 w-8 h-8 border border-luxury-accent rounded-full pointer-events-none z-[30000] flex items-center justify-center hidden md:flex"
       style={{
         x: cursorX,
         y: cursorY,
         translateX: "-50%",
         translateY: "-50%",
-        scale: isHovering ? 2.5 : 1,
+        scale: isHovering ? 2 : 1,
       }}
-      transition={{ type: "spring", damping: 30, stiffness: 200 }}
     >
-      <div className="w-1 h-1 bg-luxury-accent rounded-full" />
+      <div className="w-1.5 h-1.5 bg-luxury-accent rounded-full shadow-[0_0_10px_#c5a358]" />
     </motion.div>
   );
 };
@@ -189,44 +190,47 @@ const ProjectCard = ({ project }: { project: Project, key?: any }) => {
       viewport={{ once: true }}
       className="group cursor-pointer relative"
     >
-      <div className="relative aspect-video bg-luxury-black overflow-hidden mb-6 flex items-center justify-center">
-        {/* Parallax Background */}
-        <motion.div 
-          style={{ y: parallaxY }}
-          className="absolute inset-x-0 h-[150%] flex items-center justify-center opacity-10 pointer-events-none select-none"
-        >
-          <span className="text-white font-serif text-[15vw] uppercase whitespace-nowrap">
-            {project.title.split(' ')[0]}
-          </span>
-        </motion.div>
-
-        <div className="absolute inset-0 bg-luxury-accent/5 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-all duration-500 z-10" />
-        
-        {/* View Case Study Button Overlay */}
-        <div className="absolute inset-0 z-20 flex items-center justify-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileHover={{ scale: 1.05 }}
-            className="opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-4 transition-all duration-500"
+      <a 
+        href={project.url} 
+        target="_blank" 
+        rel="noreferrer"
+        className="block"
+      >
+        <div className="relative aspect-video bg-luxury-black overflow-hidden mb-6 flex items-center justify-center">
+          {/* Parallax Background */}
+          <motion.div 
+            style={{ y: parallaxY }}
+            className="absolute inset-x-0 h-[150%] flex items-center justify-center opacity-10 pointer-events-none select-none"
           >
-            <a 
-              href="#"
-              className="bg-white text-luxury-black px-8 py-4 text-[10px] uppercase font-bold tracking-[0.2em] shadow-2xl hover:bg-luxury-accent hover:text-white transition-colors"
-            >
-              View Project
-            </a>
+            <span className="text-white font-serif text-[15vw] uppercase whitespace-nowrap">
+              {project.title.split(' ')[0]}
+            </span>
           </motion.div>
-        </div>
 
-        <a 
-          href={project.url} 
-          target="_blank" 
-          rel="noreferrer"
-          className="absolute bottom-6 right-6 p-4 bg-white text-luxury-black rounded-full opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all z-30 shadow-lg"
-        >
-          <ExternalLink className="w-5 h-5" />
-        </a>
-      </div>
+          <div className="absolute inset-0 bg-luxury-accent/5 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-all duration-500 z-10" />
+          
+          {/* View Case Study Button Overlay - Visible on Desktop Hover */}
+          <div className="absolute inset-0 z-20 flex items-center justify-center hidden md:flex">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileHover={{ scale: 1.05 }}
+              className="opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-4 transition-all duration-500"
+            >
+              <div 
+                className="bg-white text-luxury-black px-8 py-4 text-[10px] uppercase font-bold tracking-[0.2em] shadow-2xl group-hover:bg-luxury-accent group-hover:text-white transition-colors"
+              >
+                View Project
+              </div>
+            </motion.div>
+          </div>
+
+          <div 
+            className="absolute bottom-6 right-6 p-4 bg-white text-luxury-black rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 translate-y-0 md:translate-y-4 md:group-hover:translate-y-0 transition-all z-30 shadow-lg"
+          >
+            <ExternalLink className="w-5 h-5" />
+          </div>
+        </div>
+      </a>
 
       <motion.div 
         className="space-y-3 relative z-10"
@@ -456,7 +460,7 @@ function HomeView() {
     <div 
       ref={containerRef} 
       dir="ltr"
-      className="relative min-h-screen luxury-grid selection:bg-luxury-accent/20 cursor-none font-sans"
+      className="relative min-h-screen luxury-grid selection:bg-luxury-accent/20 md:cursor-none font-sans"
     >
       <AnimatePresence>
         {isLoading && (
@@ -685,7 +689,7 @@ function HomeView() {
             >
               Senior Backend Architect
             </motion.span>
-            <h1 className="text-5xl md:text-8xl lg:text-9xl font-serif leading-[0.9] tracking-tighter">
+            <h1 className="text-4xl md:text-8xl lg:text-9xl font-serif leading-[0.9] tracking-tighter">
               CRAFTING <br />
               <motion.span 
                 initial={{ opacity: 0.5 }}
@@ -760,7 +764,7 @@ function HomeView() {
         <div className="max-w-7xl mx-auto">
           <SectionHeader title="Technical Excellence" subtitle="Vision & Strategy" />
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {SKILLS.map((skill, index) => (
               <motion.div 
                 key={index}
@@ -814,7 +818,7 @@ function HomeView() {
       <section id="work" className="py-32 px-6 md:px-12 lg:px-24 border-b border-black/5">
         <div className="max-w-7xl mx-auto">
           <SectionHeader title="Selected Commissions" subtitle="The Portfolio" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-x-12 lg:gap-y-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-x-12 lg:gap-y-24">
             {PROJECTS.map((project, index) => (
               <ProjectCard key={index} project={project} />
             ))}

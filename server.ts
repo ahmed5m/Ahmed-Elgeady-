@@ -15,12 +15,14 @@ const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
-// Initialize Firebase Admin SDK for user management
+// Initialize Firebase Admin SDK for user management and database access
 try {
   admin.initializeApp();
 } catch (e) {
   console.warn("Firebase Admin failed to initialize with default credentials. User management might be limited.");
 }
+
+const dbAdmin = admin.firestore();
 
 async function startServer() {
   const app = express();
@@ -102,23 +104,23 @@ async function startServer() {
     }
 
     try {
-      // 1. Save to Firestore
-      await addDoc(collection(db, "inquiries"), {
+      // 1. Save to Firestore using Admin SDK to bypass rules
+      await dbAdmin.collection("inquiries").add({
         name,
         email,
         phone: phone || null,
         description,
-        createdAt: serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // 1.1 Create Notification for Admin
-      await addDoc(collection(db, "notifications"), {
+      await dbAdmin.collection("notifications").add({
         role: 'admin',
         title: "New Inquiry Received",
         message: `New inquiry from ${name}: ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}`,
         read: false,
         type: 'inquiry',
-        createdAt: serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // 2. Send Emails
