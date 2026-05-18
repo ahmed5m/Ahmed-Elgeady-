@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
-import { auth, db } from "../lib/firebase";
+import { auth, db, handleFirestoreError, OperationType } from "../lib/firebase";
 import { 
   signOut, 
   GoogleAuthProvider, 
@@ -79,6 +79,7 @@ interface UserProfile {
   name: string;
   role: 'admin' | 'engineer';
   status: 'active' | 'suspended';
+  createdAt?: any;
 }
 
 interface Invoice {
@@ -179,10 +180,21 @@ interface Activity {
   createdAt: any;
 }
 
+const safeISODate = (date: any) => {
+  if (!date) return "";
+  try {
+    const d = date.toDate ? date.toDate() : new Date(date);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split('T')[0];
+  } catch (e) {
+    return "";
+  }
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState(auth.currentUser);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'projects' | 'inquiries' | 'team' | 'reports' | 'financials' | 'my-tasks' | 'ai-lab' | 'profile'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'projects' | 'inquiries' | 'team' | 'reports' | 'financials' | 'my-tasks' | 'profile'>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const createNotification = async (notif: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
@@ -257,12 +269,12 @@ export default function Dashboard() {
             } catch (err) {
               console.error("Profile initialization failed", err);
               // Fallback to avoid getting stuck in loading
-              setUserProfile({ id: u.uid, email: u.email || "", name: u.displayName || "User", role: 'engineer', status: 'available', createdAt: new Date() });
+              setUserProfile({ id: u.uid, email: u.email || "", name: u.displayName || "User", role: 'engineer', status: 'active', createdAt: new Date() });
               setIsLoading(false);
             }
           }
         }, (error) => {
-          console.error("Profile snapshot failed", error);
+          handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
           setIsLoading(false);
         });
       } else {
@@ -314,31 +326,31 @@ export default function Dashboard() {
     // Data Listeners
     const unsubInquiries = onSnapshot(qInquiries, (snap) => {
       setInquiries(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Inquiry)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "inquiries"));
 
     const unsubActivities = onSnapshot(qActivities, (snap) => {
       setActivities(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Activity)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "activities"));
 
     const unsubClients = onSnapshot(qClients, (snap) => {
       setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "clients"));
 
     const unsubProjects = onSnapshot(qProjects, (snap) => {
       setProjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "projects"));
 
     const unsubTeam = onSnapshot(qTeam, (snap) => {
       setTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeamMember)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "team"));
 
     const unsubInvoices = onSnapshot(qInvoices, (snap) => {
       setInvoices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "invoices"));
 
     const unsubAllTasks = onSnapshot(qAllTasks, (snap) => {
       setAllTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "tasks"));
 
     const unsubNotifications = onSnapshot(qNotifications, (snap) => {
       setNotifications(snap.docs
@@ -349,7 +361,7 @@ export default function Dashboard() {
           return false;
         })
       );
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "notifications"));
 
     // Overdue Invoices Check
     const checkOverdueInvoices = async () => {
@@ -554,7 +566,6 @@ export default function Dashboard() {
               <NavItem active={activeTab === 'financials'} icon={<DollarSign />} label="Financials" onClick={() => { setActiveTab('financials'); setSelectedProject(null); setIsSidebarOpen(false); }} />
               <NavItem active={activeTab === 'reports'} icon={<PieChartIcon />} label="Analytics" onClick={() => { setActiveTab('reports'); setSelectedProject(null); setIsSidebarOpen(false); }} />
               <NavItem active={activeTab === 'inquiries'} icon={<MessageSquare />} label="Leads" badge={inquiries.length} onClick={() => { setActiveTab('inquiries'); setSelectedProject(null); setIsSidebarOpen(false); }} />
-              <NavItem active={activeTab === 'ai-lab'} icon={<Cpu />} label="AI Logic Auditor" onClick={() => { setActiveTab('ai-lab'); setSelectedProject(null); setIsSidebarOpen(false); }} />
               <div className="pt-4 border-t border-zinc-900 mx-2"></div>
               <NavItem active={activeTab === 'profile'} icon={<UserCircle />} label="My Profile" onClick={() => { setActiveTab('profile'); setSelectedProject(null); setIsSidebarOpen(false); }} />
             </>
@@ -628,7 +639,6 @@ export default function Dashboard() {
                 {activeTab === 'team' && <TeamModule team={team} createActivity={createActivity} />}
                 {activeTab === 'financials' && <FinancialsModule projects={projects} invoices={invoices} createActivity={createActivity} />}
                 {activeTab === 'reports' && <ReportsModule projects={projects} clients={clients} team={team} inquiries={inquiries} allTasks={allTasks} />}
-                {activeTab === 'ai-lab' && userProfile?.role === 'admin' && <AIAuditView projects={projects} team={team} />}
                 {activeTab === 'profile' && <ProfileView user={user} userProfile={userProfile} createActivity={createActivity} />}
               </>
             )}
@@ -767,36 +777,8 @@ function NavItem({ active, icon, label, onClick, badge }: { active: boolean, ico
 // --- Sub-Components ---
 
 function Overview({ activities, inquiries, clients, projects, team, invoices }: { activities: Activity[], inquiries: Inquiry[], clients: Client[], projects: Project[], team: TeamMember[], invoices: Invoice[] }) {
-  const [isBriefing, setIsBriefing] = useState(false);
-  const [briefing, setBriefing] = useState("");
-
   const totalRevenue = projects.reduce((acc, p) => acc + (p.budget || 0), 0);
   const pendingInvoices = invoices.filter(i => i.status !== 'paid').reduce((acc, i) => acc + i.amount, 0);
-
-  const generateBriefing = async () => {
-    setIsBriefing(true);
-    try {
-      const res = await fetch("/api/ai/briefing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          data: {
-            projects,
-            revenue: totalRevenue,
-            team,
-            leads: inquiries,
-            recentActivities: activities.slice(0, 5)
-          }
-        })
-      });
-      const data = await res.json();
-      setBriefing(data.report);
-    } catch (e) {
-      alert("Failed to connect with AI Advisor.");
-    } finally {
-      setIsBriefing(false);
-    }
-  };
 
   const chartData = [
     { name: 'Leads', value: inquiries.length, color: '#60a5fa' },
@@ -826,32 +808,9 @@ function Overview({ activities, inquiries, clients, projects, team, invoices }: 
         <div className="absolute top-0 right-0 w-96 h-96 bg-luxury-accent/5 rounded-full -mr-48 -mt-48 blur-3xl"></div>
         <div className="relative z-10 space-y-2">
           <h2 className="text-4xl font-serif">Command Center</h2>
-          <p className="text-zinc-500 text-xs uppercase font-bold tracking-[0.2em]">Operational Pulse & Strategic Briefing</p>
+          <p className="text-zinc-500 text-xs uppercase font-bold tracking-[0.2em]">Operational Pulse & Strategic View</p>
         </div>
-        <button 
-          onClick={generateBriefing}
-          disabled={isBriefing}
-          className="relative z-10 px-8 py-4 bg-white text-black font-bold rounded-2xl hover:bg-luxury-accent transition-all flex items-center gap-3 active:scale-95 disabled:opacity-50"
-        >
-          {isBriefing ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} className="fill-current" />}
-          {isBriefing ? "Synthesizing Data..." : "Generate AI Briefing"}
-        </button>
       </div>
-
-      {briefing && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-luxury-accent/5 border border-luxury-accent/20 p-8 rounded-3xl relative"
-        >
-          <button onClick={() => setBriefing("")} className="absolute top-4 right-4 text-luxury-accent/40 hover:text-luxury-accent">
-            <Plus size={24} className="rotate-45" />
-          </button>
-          <div className="prose prose-invert prose-zinc max-w-none prose-h1:text-luxury-accent prose-h1:text-xl prose-h1:font-serif">
-            <ReactMarkdown>{briefing}</ReactMarkdown>
-          </div>
-        </motion.div>
-      )}
 
       {/* Top Cards - Executive Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1353,7 +1312,7 @@ function ProjectDetailsView({ project, client, team, onBack, userRole, createNot
         .map(doc => ({ id: doc.id, ...doc.data() } as Task))
         .filter(t => t.projectId === project.id)
       );
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "tasks"));
     return unsubscribe;
   }, [project.id]);
 
@@ -1502,7 +1461,7 @@ function ProjectDetailsView({ project, client, team, onBack, userRole, createNot
                           Client: <span className="text-luxury-accent font-medium">{client?.name || 'Decommissioned Client'}</span>
                        </p>
                        <div className="hidden sm:block w-1 h-1 bg-zinc-800 rounded-full"></div>
-                       <p className="text-zinc-600 text-[10px] font-bold tracking-widest uppercase">EID: {project.id.slice(0, 12)}</p>
+                       <p className="text-zinc-600 text-[10px] font-bold tracking-widest uppercase">EID: {project.id?.slice(0, 12) || 'N/A'}</p>
                     </div>
                   </div>
                   <StatusBadge status={project.status} />
@@ -1546,7 +1505,7 @@ function ProjectDetailsView({ project, client, team, onBack, userRole, createNot
                     <input 
                       type="date"
                       disabled={!isAdmin}
-                      value={project.deadline ? (project.deadline.toDate ? project.deadline.toDate() : new Date(project.deadline)).toISOString().split('T')[0] : ""}
+                      value={safeISODate(project.deadline)}
                       onChange={async (e) => {
                         const date = new Date(e.target.value);
                         await updateDoc(doc(db, "projects", project.id), { deadline: date });
@@ -1682,7 +1641,7 @@ function ProjectDetailsView({ project, client, team, onBack, userRole, createNot
                                      <input 
                                        type="date"
                                        disabled={!isAdmin}
-                                       value={task.dueDate ? (task.dueDate.toDate ? task.dueDate.toDate() : new Date(task.dueDate)).toISOString().split('T')[0] : ""}
+                                       value={safeISODate(task.dueDate)}
                                        onChange={(e) => updateTask(task.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
                                        className={`bg-transparent border-none text-[10px] text-zinc-600 focus:text-zinc-400 outline-none cursor-pointer ${!isAdmin && 'pointer-events-none'}`}
                                      />
@@ -1863,11 +1822,15 @@ function TeamModule({ team, createActivity }: { team: TeamMember[], createActivi
 
   const handleAdd = async (e: FormEvent) => {
     e.preventDefault();
-    const docRef = await addDoc(collection(db, "team"), {
-      name, email, phone, role, status: 'available', createdAt: serverTimestamp()
-    });
-    await createActivity(`Onboarded new Team Member: ${name}`, docRef.id, 'team');
-    setName(""); setEmail(""); setPhone(""); setRole(""); setShowAdd(false);
+    try {
+      const docRef = await addDoc(collection(db, "team"), {
+        name, email, phone, role, status: 'available', createdAt: serverTimestamp()
+      });
+      await createActivity(`Onboarded new Team Member: ${name}`, docRef.id, 'team');
+      setName(""); setEmail(""); setPhone(""); setRole(""); setShowAdd(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, "team");
+    }
   };
 
   const updateStatus = async (id: string, name: string, status: string) => {
@@ -2143,7 +2106,7 @@ function EngineerWorkspace({ projects, team, user, createActivity }: { projects:
         .map(doc => ({ id: doc.id, ...doc.data() } as Task))
         .filter(t => t.assignedTo === user.uid)
       );
-    });
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "tasks"));
   }, [user.uid]);
 
   const toggleTask = async (task: Task) => {
@@ -2351,114 +2314,6 @@ function FinancialsModule({ projects, invoices, createActivity }: { projects: Pr
         {invoices.length === 0 && (
           <div className="py-20 text-center text-zinc-600 font-serif italic text-lg opacity-40">No billing events captured.</div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function AIAuditView({ projects, team }: { projects: Project[], team: TeamMember[] }) {
-  const [auditTarget, setAuditTarget] = useState<string>("");
-  const [targetType, setTargetType] = useState<string>("Code Snippet");
-  const [report, setReport] = useState<string>("");
-  const [isAuditing, setIsAuditing] = useState(false);
-
-  const performAudit = async () => {
-    if (!auditTarget) return;
-    setIsAuditing(true);
-    setReport("");
-    try {
-      const res = await fetch("/api/ai/audit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: auditTarget, type: targetType })
-      });
-      const data = await res.json();
-      if (data.report) setReport(data.report);
-      else if (data.error) setReport(`### AUDIT_FAILURE\n${data.error}`);
-    } catch (e) {
-      setReport("### SYSTEM_ERROR\nFailed to establish link with Architectural AI.");
-    } finally {
-      setIsAuditing(false);
-    }
-  };
-
-  return (
-    <div className="space-y-10">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <div className="space-y-6">
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl space-y-6">
-            <div>
-              <h3 className="text-2xl font-serif mb-2">Logic Stream Intake</h3>
-              <p className="text-zinc-500 text-xs uppercase tracking-widest font-bold">Submit architecture for verification</p>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => setTargetType("Code Snippet")}
-                  className={`px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${targetType === 'Code Snippet' ? 'bg-luxury-accent text-black border-luxury-accent' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}
-                >
-                  Raw Logic
-                </button>
-                <button 
-                  onClick={() => setTargetType("Project Roadmap")}
-                  className={`px-4 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${targetType === 'Project Roadmap' ? 'bg-luxury-accent text-black border-luxury-accent' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}
-                >
-                  System Flow
-                </button>
-              </div>
-
-              <textarea 
-                value={auditTarget}
-                onChange={(e) => setAuditTarget(e.target.value)}
-                placeholder={targetType === 'Code Snippet' ? "Paste TypeScript logic or API definitions here..." : "Describe a project workflow or dependency chain..."}
-                className="w-full h-80 bg-zinc-950 border border-zinc-800 rounded-2xl p-6 text-sm text-zinc-300 font-mono outline-none focus:border-luxury-accent resize-none placeholder:text-zinc-800"
-              />
-
-              <button 
-                onClick={performAudit}
-                disabled={isAuditing || !auditTarget}
-                className="w-full py-5 bg-white text-black font-bold rounded-2xl hover:bg-luxury-accent transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {isAuditing ? <Loader2 className="animate-spin" size={20} /> : <Cpu size={20} />}
-                {isAuditing ? "Auditing Architecture..." : "Initiate System Review"}
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-             <h4 className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-4">Audit Guidelines</h4>
-             <ul className="space-y-2 text-xs text-zinc-400 font-light list-disc pl-4 opacity-70">
-                <li>Submit standalone functions or classes for precise vulnerability scanning.</li>
-                <li>Describe project interdependencies to detect race conditions.</li>
-                <li>Performance review focuses on computational complexity and I/O overhead.</li>
-             </ul>
-          </div>
-        </div>
-
-        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl min-h-[600px] flex flex-col">
-           <div className="flex justify-between items-center mb-8 pb-6 border-b border-zinc-800">
-             <h3 className="text-2xl font-serif">Audit Consensus</h3>
-             <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${report ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-600'}`}>
-               {report ? "Verdict Ready" : "Awaiting Input"}
-             </div>
-           </div>
-
-           <div className="flex-1 overflow-auto prose prose-invert prose-zinc max-w-none">
-              {report ? (
-                <div className="markdown-body">
-                  <ReactMarkdown>{report}</ReactMarkdown>
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-20">
-                   <ShieldCheck size={64} />
-                   <p className="font-serif text-xl italic text-zinc-600 px-10 leading-relaxed">
-                     The Architectural Engine is scanning for irregularities. Submit logic to proceed.
-                   </p>
-                </div>
-              )}
-           </div>
-        </div>
       </div>
     </div>
   );

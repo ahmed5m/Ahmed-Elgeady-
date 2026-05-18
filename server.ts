@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import { initializeApp } from "firebase/app";
@@ -23,89 +22,11 @@ try {
   console.warn("Firebase Admin failed to initialize with default credentials. User management might be limited.");
 }
 
-const genAI = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY || "",
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
-
-  // API Routes
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
-
-  // AI Code Auditor
-  app.post("/api/ai/audit", async (req, res) => {
-    const { code, type } = req.body;
-    if (!code) return res.status(400).json({ error: "No logic stream provided for auditing." });
-
-    const prompt = `
-      You are a Senior Architectural Auditor. Analyze the following logic stream for:
-      1. Security Vulnerabilities (Injection, Auth gaps, data leaks)
-      2. Performance Bottlenecks (Recursion, O(N^2) complexity, memory leaks)
-      3. Logical Defects (State desync, race conditions)
-      
-      Logic Stream (${type || 'Generic'}):
-      ${code}
-
-      Return your audit in a concise, authoritative technical report format using Markdown. 
-      Use sections: [VULNERABILITY_ASSESSMENT], [PERFORMANCE_PROFILE], [ACTIONABLE_REMEDIATION].
-      Include a "SECURITY_SCORE" from 0-100.
-    `;
-
-    try {
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt
-      });
-      res.json({ report: response.text });
-    } catch (error) {
-      console.error("AI Audit error:", error);
-      res.status(500).json({ error: "Architectural AI is offline." });
-    }
-  });
-
-  // AI Executive Briefing
-  app.post("/api/ai/briefing", async (req, res) => {
-    const { data } = req.body;
-    if (!data) return res.status(400).json({ error: "Insufficient system telemetry for briefing." });
-
-    const prompt = `
-      You are the System Architect's AI Advisor. Analyze the following project data and provide a high-level Executive Briefing:
-      - Current Projects: ${data.projects?.length || 0}
-      - Total Revenue: $${data.revenue || 0}
-      - Active Team Members: ${data.team?.length || 0}
-      - Pending Leads: ${data.leads?.length || 0}
-      - Recent Activities: ${JSON.stringify(data.recentActivities)}
-
-      Format:
-      # EXECUTIVE_FLASH_REPORT
-      - [STRENGTHS]: What is going well?
-      - [CRITICAL_RISKS]: What needs the manager's immediate attention?
-      - [STRATEGIC_RECOMMENDATIONS]: Next steps for scaling or optimization.
-      Keep it professional, concise, and punchy.
-    `;
-
-    try {
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt
-      });
-      res.json({ report: response.text });
-    } catch (error) {
-      console.error("Briefing error:", error);
-      res.status(500).json({ error: "Advisor link failed." });
-    }
-  });
 
   // System Broadcast
   app.post("/api/system/broadcast", async (req, res) => {

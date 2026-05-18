@@ -596,6 +596,12 @@ function HomeView() {
           >
             Hire Me
           </a>
+          <a 
+            href="/admin" 
+            className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-luxury-accent transition-colors"
+          >
+            Terminal
+          </a>
         </div>
 
         <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -624,7 +630,7 @@ function HomeView() {
             
             <div className="space-y-4">
               <span className="text-[10px] uppercase tracking-[0.4em] text-luxury-accent font-bold mb-4 block">Navigation</span>
-              {["Services", "Work", "About", "Contact"].map((item, i) => (
+              {["Services", "Work", "About", "Contact", "Terminal"].map((item, i) => (
                 <motion.div
                   initial={{ x: 50, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
@@ -632,7 +638,7 @@ function HomeView() {
                   key={item}
                 >
                   <a 
-                    href={`#${item.toLowerCase()}`} 
+                    href={item === "Terminal" ? "/admin" : `#${item.toLowerCase()}`}
                     onClick={() => setIsMenuOpen(false)}
                     className="text-6xl font-serif tracking-tighter hover:text-luxury-accent transition-colors block"
                   >
